@@ -11,7 +11,7 @@ variable "ha_region" {
 
 variable "transit_firenet" {
  description = "Enable Transit Firenet"
-  default     = false
+  default     = true
   type        = string
 }
 
@@ -27,6 +27,12 @@ variable "instance_size" {
 }
 
 
+variable "insane_instance_size" {
+  description = "Size of the compute instance for the Aviatrix Gateways"
+  default     = "n1-highcpu-4"
+  type        = string
+}
+
 variable "fw_instance_size" {
   description = "Size of the compute instance for the Aviatrix Gateways"
   default     = "n1-standard-4"
@@ -38,7 +44,7 @@ variable "transit_cidr" {
   type        = string
 }
 
-variable "ha_transit_cidr" {
+variable "firewall_cidr" {
   description = "CIDR of the HA GCP subnet"
   type        = string
   default     = ""
@@ -53,11 +59,11 @@ variable "egress_subnet_cidr" {
   default     = ""
 }
 
-variable "ha_egress_subnet_cidr" {
-  description = "CIDR of the HA GCP subnet"
-  type        = string
-  default     = ""
-}
+# variable "ha_egress_subnet_cidr" {
+#   description = "CIDR of the HA GCP subnet"
+#   type        = string
+#   default     = ""
+# }
 
 variable "lan_subnet_cidr" {
   description = "CIDR of the HA GCP subnet"
@@ -65,11 +71,11 @@ variable "lan_subnet_cidr" {
   default     = ""
 }
 
-variable "ha_lan_subnet_cidr" {
-  description = "CIDR of the HA GCP subnet"
-  type        = string
-  default     = ""
-}
+# variable "ha_lan_subnet_cidr" {
+#   description = "CIDR of the HA GCP subnet"
+#   type        = string
+#   default     = ""
+# }
 
 
 variable "mgmt_subnet_cidr" {
@@ -78,11 +84,11 @@ variable "mgmt_subnet_cidr" {
   default     = ""
 }
 
-variable "ha_mgmt_subnet_cidr" {
-  description = "CIDR of the HA GCP subnet"
-  type        = string
-  default     = ""
-}
+# variable "ha_mgmt_subnet_cidr" {
+#   description = "CIDR of the HA GCP subnet"
+#   type        = string
+#   default     = ""
+# }
 
 ########################################################################
 variable "ha_gw" {
@@ -198,17 +204,6 @@ variable "firewall_image_version" {
   type        = string
 }
 
-variable "firewall_username" {
-  description = "The username for the administrator account"
-  type        = string
-  default     = "avxadmin"
-}
-
-variable "password" {
-  description = "Firewall instance password"
-  type        = string
-  default     = "@Aviatrix123"
-}
 
 variable "egress_enabled" {
   description = "Set to true to enable egress inspection on the firewall instances"
@@ -222,6 +217,20 @@ variable "inspection_enabled" {
   default     = true
 }
 
+
+variable "attached" {
+  description = "Boolean to determine if the spawned firewall instances will be attached on creation"
+  type        = bool
+  default     = true
+}
+
+variable "bootstrap_bucket_name" {
+  description = "The firewall bootstrap bucket name"
+  type        = string
+  default     = null
+}
+
+
 locals {
   is_checkpoint = length(regexall("check", lower(var.firewall_image))) > 0 #Check if fw image contains checkpoint. Needs special handling for the username/password
   is_palo       = length(regexall("palo", lower(var.firewall_image))) > 0  #Check if fw image contains palo. Needs special handling for management_subnet (CP & Fortigate null)
@@ -229,23 +238,17 @@ locals {
   prefix     = var.prefix ? "avx-" : ""
   suffix     = var.suffix ? "-transit" : ""
   name       = "${local.prefix}${local.lower_name}${local.suffix}"
+  cidrbits                 = tonumber(split("/", var.transit_cidr)[1])
+  newbits                  = 26 - local.cidrbits
+  netnum                   = pow(2, local.newbits)
+  lan_subnet_cidr     = cidrsubnet(var.firewall_cidr, local.newbits, local.netnum -4)
+  egress_subnet_cidr     = cidrsubnet(var.firewall_cidr, local.newbits, local.netnum - 2)
+  mgmt_subnet_cidr    = cidrsubnet(var.firewall_cidr, local.newbits, local.netnum - 3)
 
-
-  transit_subnet     = length(var.ha_region) > 0 ? aviatrix_vpc.default.subnets[0].cidr : aviatrix_vpc.default.subnets[0].cidr
-  ha_transit_subnet  = length(var.ha_region) > 0 ? aviatrix_vpc.default.subnets[1].cidr : aviatrix_vpc.default.subnets[0].cidr
-
-  # # MGMT
-  mgmt_subnet     = length(var.ha_region) > 0 ? aviatrix_vpc.mgmt_vpc.subnets[0].cidr : aviatrix_vpc.default.subnets[0].cidr
-  ha_mgmt_subnet  = length(var.ha_region) > 0 ? aviatrix_vpc.mgmt_vpc.subnets[1].cidr : aviatrix_vpc.default.subnets[0].cidr
-
-  # LAN
-  lan_subnet     = length(var.ha_region) > 0 ? aviatrix_vpc.lan_vpc.subnets[0].cidr : aviatrix_vpc.default.subnets[0].cidr
-  ha_lan_subnet  = length(var.ha_region) > 0 ? aviatrix_vpc.lan_vpc.subnets[1].cidr : aviatrix_vpc.default.subnets[0].cidr
-
-  # Egress
-  egress_subnet     = length(var.ha_region) > 0 ? aviatrix_vpc.egress_vpc.subnets[0].cidr : aviatrix_vpc.default.subnets[0].cidr
-  ha_egress_subnet  = length(var.ha_region) > 0 ? aviatrix_vpc.egress_vpc.subnets[1].cidr : aviatrix_vpc.default.subnets[0].cidr
-
+  transit_subnet  = aviatrix_vpc.default.subnets[0].cidr
+  mgmt_subnet     =  aviatrix_vpc.mgmt_vpc.subnets[0].cidr
+  lan_subnet     = aviatrix_vpc.lan_vpc.subnets[0].cidr
+  egress_subnet     =  aviatrix_vpc.egress_vpc.subnets[0].cidr
   region1    = "${var.region}-${var.az1}"
   region2    = length(var.ha_region) > 0 ? "${var.ha_region}-${var.az2}" : "${var.region}-${var.az2}"
 }

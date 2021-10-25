@@ -3,11 +3,14 @@
 # GCP zones b,c are almost universally available that's why we chose them
 
 
+
 data "aviatrix_account" "account_id" {
   account_name = var.account
 }
 
 
+
+# Transit VPC
 resource "aviatrix_vpc" "default" {
   cloud_type           = 4
   account_name         = var.account
@@ -20,19 +23,10 @@ resource "aviatrix_vpc" "default" {
     cidr   = var.transit_cidr
     region = var.region
   }
-
-  dynamic "subnets" {
-    for_each = length(var.ha_region) > 0 ? ["dummy"] : []
-    content {
-      name   = "${local.name}-ha"
-      cidr   = var.ha_transit_cidr
-      region = var.ha_region
-    }
-  }
 }
 
 
-
+# Management VPC
 resource "aviatrix_vpc" "mgmt_vpc" {
   cloud_type           = 4
   account_name         = var.account
@@ -42,22 +36,12 @@ resource "aviatrix_vpc" "mgmt_vpc" {
 
   subnets {
     name   = "${local.name}-mgmt"
-    cidr   = var.mgmt_subnet_cidr
+    cidr   = local.mgmt_subnet_cidr
     region = var.region
-  }
-
-  dynamic "subnets" {
-    for_each = length(var.ha_region) > 0 ? ["dummy"] : []
-    content {
-      name   = "${local.name}-mgmt-ha"
-      cidr   = var.ha_mgmt_subnet_cidr
-      region = var.ha_region
-    }
   }
 }
 
-
-
+# LAN VPC 
 resource "aviatrix_vpc" "lan_vpc" {
   cloud_type           = 4
   account_name         = var.account
@@ -67,20 +51,12 @@ resource "aviatrix_vpc" "lan_vpc" {
 
   subnets {
     name   = "${local.name}-lan"
-    cidr   = var.lan_subnet_cidr
+    cidr   = local.lan_subnet_cidr
     region = var.region
-  }
-
-  dynamic "subnets" {
-    for_each = length(var.ha_region) > 0 ? ["dummy"] : []
-    content {
-      name   = "${local.name}-lan-ha"
-      cidr   = var.ha_lan_subnet_cidr
-      region = var.ha_region
-    }
   }
 }
 
+# Egress VPC
 resource "aviatrix_vpc" "egress_vpc" {
   cloud_type           = 4
   account_name         = var.account
@@ -89,33 +65,24 @@ resource "aviatrix_vpc" "egress_vpc" {
   aviatrix_firenet_vpc = false
   subnets {
     name   = "${local.name}-egress"
-    cidr   = var.egress_subnet_cidr
+    cidr   = local.egress_subnet_cidr
     region = var.region
-  }
-
-  dynamic "subnets" {
-    for_each = length(var.ha_region) > 0 ? ["dummy"] : []
-    content {
-      name   = "${local.name}-egress-ha"
-      cidr   = var.ha_egress_subnet_cidr
-      region = var.ha_region
-    }
   }
 }
 
-
+# Aviatrix Transit GW
 resource "aviatrix_transit_gateway" "default" {
   gw_name                          = local.name
   vpc_id                           = aviatrix_vpc.default.name
   cloud_type                       = 4
   vpc_reg                          = local.region1
   enable_active_mesh               = var.active_mesh
-  gw_size                          = var.instance_size
+  gw_size                          = var.insane_mode ? var.insane_instance_size : var.instance_size
   account_name                     = var.account
   subnet                           = local.transit_subnet
   insane_mode                      = var.insane_mode
-  ha_subnet                        = var.ha_gw ? local.ha_transit_subnet : null
-  ha_gw_size                       = var.ha_gw ? var.instance_size : null
+  ha_subnet                        = var.ha_gw ? local.transit_subnet : null
+  ha_gw_size                       = var.ha_gw ? (var.insane_mode ? var.insane_instance_size : var.instance_size) : null
   ha_zone                          = var.ha_gw ? local.region2 : null
   connected_transit                = var.connected_transit
   bgp_manual_spoke_advertise_cidrs = var.bgp_manual_spoke_advertise_cidrs
@@ -132,7 +99,7 @@ resource "aviatrix_transit_gateway" "default" {
 }
 
 
-
+# Firewall instances 
 resource "aviatrix_firewall_instance" "firewall_instance" {
   count                  = var.ha_gw ? 0 : 1
   firewall_name          = "${local.name}-fw"
@@ -145,7 +112,8 @@ resource "aviatrix_firewall_instance" "firewall_instance" {
   management_subnet      = "${local.mgmt_subnet}~~${var.region}~~${local.name}-mgmt"
   management_vpc_id =    aviatrix_vpc.mgmt_vpc.vpc_id
   egress_vpc_id =  aviatrix_vpc.egress_vpc.vpc_id
-  zone                   = var.ha_gw ? local.region1 : null
+  bootstrap_bucket_name = var.bootstrap_bucket_name
+  zone                   = local.region1
 }
 
 
@@ -162,6 +130,8 @@ resource "aviatrix_firewall_instance" "firewall_instance_1" {
   management_subnet      = "${local.mgmt_subnet}~~${var.region}~~${local.name}-mgmt"
   management_vpc_id =    aviatrix_vpc.mgmt_vpc.vpc_id
   egress_vpc_id =  aviatrix_vpc.egress_vpc.vpc_id
+  bootstrap_bucket_name = var.bootstrap_bucket_name
+
   zone                   = var.ha_gw ? local.region1 : null
 }
 
@@ -172,16 +142,19 @@ resource "aviatrix_firewall_instance" "firewall_instance_2" {
   vpc_id                 = "${local.name}~-~${data.aviatrix_account.account_id.gcloud_project_id}"
   firewall_image         = var.firewall_image
   firewall_image_version = var.firewall_image_version
-  egress_subnet          = "${local.ha_egress_subnet}~~${var.region}~~${local.name}-egress-ha"
+  egress_subnet          = "${local.egress_subnet}~~${var.region}~~${local.name}-egress"
   firenet_gw_name        = aviatrix_transit_gateway.default.gw_name
-  management_subnet      = "${local.ha_mgmt_subnet}~~${var.region}~~${local.name}-mgmt-ha"
+  management_subnet      = "${local.mgmt_subnet}~~${var.region}~~${local.name}-mgmt"
   management_vpc_id =  aviatrix_vpc.mgmt_vpc.vpc_id
   egress_vpc_id = aviatrix_vpc.egress_vpc.vpc_id
+  bootstrap_bucket_name = var.bootstrap_bucket_name
+
   zone                   = var.ha_gw ? local.region2 : null
 }
 
 
 
+# Firenet
 resource "aviatrix_firenet" "firenet" {
   vpc_id                               = format("%s~-~%s", aviatrix_transit_gateway.default.vpc_id, data.aviatrix_account.account_id.gcloud_project_id)
   inspection_enabled                   = var.inspection_enabled
@@ -193,14 +166,13 @@ resource "aviatrix_firenet" "firenet" {
 
 resource "aviatrix_firewall_instance_association" "firenet_instance" {
   count                = var.ha_gw ? 0 : 1
-  vpc_id               = aviatrix_vpc.default.vpc_id
+  vpc_id               = format("%s~-~%s", aviatrix_transit_gateway.default.vpc_id, data.aviatrix_account.account_id.gcloud_project_id)
   firenet_gw_name      = aviatrix_transit_gateway.default.gw_name
   instance_id          = aviatrix_firewall_instance.firewall_instance[0].instance_id
-  firewall_name        = aviatrix_firewall_instance.firewall_instance[0].firewall_name
   lan_interface        = aviatrix_firewall_instance.firewall_instance[0].lan_interface
   management_interface = aviatrix_firewall_instance.firewall_instance[0].management_interface
   egress_interface     = aviatrix_firewall_instance.firewall_instance[0].egress_interface
-  attached             = true
+  attached             = var.attached
 }
 
 resource "aviatrix_firewall_instance_association" "firenet_instance1" {
@@ -211,7 +183,7 @@ resource "aviatrix_firewall_instance_association" "firenet_instance1" {
   lan_interface        = aviatrix_firewall_instance.firewall_instance_1[0].lan_interface
   management_interface = aviatrix_firewall_instance.firewall_instance_1[0].management_interface
   egress_interface     = aviatrix_firewall_instance.firewall_instance_1[0].egress_interface
-  attached             = true
+  attached             = var.attached
 }
 
 resource "aviatrix_firewall_instance_association" "firenet_instance2" {
@@ -222,5 +194,5 @@ resource "aviatrix_firewall_instance_association" "firenet_instance2" {
   lan_interface        = aviatrix_firewall_instance.firewall_instance_2[0].lan_interface
   management_interface = aviatrix_firewall_instance.firewall_instance_2[0].management_interface
   egress_interface     = aviatrix_firewall_instance.firewall_instance_2[0].egress_interface
-  attached             = true
+  attached             = var.attached
 }

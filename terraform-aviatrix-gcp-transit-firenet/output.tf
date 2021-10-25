@@ -1,9 +1,36 @@
-# output "vpc" {
-#   description = "Returns aviatrix_vpc object and all of its attributes"
-#   value       = aviatrix_vpc.default
-# }
+output "transit_vpc" {
+  description = "The created Transit VPC with all of it's attributes"
+  value       = aviatrix_vpc.default
+}
 
-# output "transit_gateway" {
-#   description = "Return Aviatrix Transit Gateway with all attributes"
-#   value       = aviatrix_transit_gateway.default
-# }
+output "egress_vpc" {
+  description = "The created Egress VPC with all of it's attributes"
+  value       = aviatrix_vpc.egress_vpc
+}
+
+    
+output "mgmt_vpc" {
+  description = "The created Management VPC with all of it's attributes"
+  value       = aviatrix_vpc.mgmt_vpc
+}
+
+
+output "lan_vpc" {
+  description = "The created LAN VPC with all of it's attributes"
+  value       = aviatrix_vpc.lan_vpc
+}
+
+output "transit_gateway" {
+  description = "The Aviatrix transit gateway object with all of it's attributes"
+  value       = aviatrix_transit_gateway.default
+}
+
+output "aviatrix_firenet" {
+  description = "The Aviatrix firenet object with all of it's attributes"
+  value       = aviatrix_firenet.firenet
+}
+
+output "aviatrix_firewall_instance" {
+  description = "A list with the created firewall instances and their attributes"
+  value       = var.ha_gw ? [aviatrix_firewall_instance.firewall_instance_1[0], aviatrix_firewall_instance.firewall_instance_2[0]] : [aviatrix_firewall_instance.firewall_instance[0]]
+}
