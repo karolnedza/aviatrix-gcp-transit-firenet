@@ -88,13 +88,13 @@ variable "name" {
 variable "prefix" {
   description = "Boolean to determine if name will be prepended with avx-"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "suffix" {
-  description = "Boolean to determine if name will be appended with -spoke"
+  description = "Boolean to determine if name will be appended with -transit"
   type        = bool
-  default     = true
+  default     = false
 }
 
 variable "connected_transit" {
