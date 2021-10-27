@@ -2,13 +2,6 @@ variable "region" {
   description = "Primary GCP region where subnet and Aviatrix Transit Gateway will be created"
   type        = string
 }
-
-variable "ha_region" {
-  description = "Secondary GCP region where subnet and HA Aviatrix Transit Gateway will be created"
-  default     = ""
-  type        = string
-}
-
 variable "transit_firenet" {
  description = "Enable Transit Firenet"
   default     = true
@@ -50,20 +43,11 @@ variable "firewall_cidr" {
   default     = ""
 }
 
-
-########################################################################
-
 variable "egress_subnet_cidr" {
   description = "CIDR of the HA GCP subnet"
   type        = string
   default     = ""
 }
-
-# variable "ha_egress_subnet_cidr" {
-#   description = "CIDR of the HA GCP subnet"
-#   type        = string
-#   default     = ""
-# }
 
 variable "lan_subnet_cidr" {
   description = "CIDR of the HA GCP subnet"
@@ -71,26 +55,12 @@ variable "lan_subnet_cidr" {
   default     = ""
 }
 
-# variable "ha_lan_subnet_cidr" {
-#   description = "CIDR of the HA GCP subnet"
-#   type        = string
-#   default     = ""
-# }
-
-
 variable "mgmt_subnet_cidr" {
   description = "CIDR of the HA GCP subnet"
   type        = string
   default     = ""
 }
 
-# variable "ha_mgmt_subnet_cidr" {
-#   description = "CIDR of the HA GCP subnet"
-#   type        = string
-#   default     = ""
-# }
-
-########################################################################
 variable "ha_gw" {
   description = "Set to false te deploy a single transit GW"
   type        = bool
@@ -232,7 +202,6 @@ variable "bootstrap_bucket_name" {
 
 
 locals {
-  is_checkpoint = length(regexall("check", lower(var.firewall_image))) > 0 #Check if fw image contains checkpoint. Needs special handling for the username/password
   is_palo       = length(regexall("palo", lower(var.firewall_image))) > 0  #Check if fw image contains palo. Needs special handling for management_subnet (CP & Fortigate null)
   lower_name = length(var.name) > 0 ? replace(lower(var.name), " ", "-") : replace(lower(var.region), " ", "-")
   prefix     = var.prefix ? "avx-" : ""
@@ -244,11 +213,10 @@ locals {
   lan_subnet_cidr     = cidrsubnet(var.firewall_cidr, local.newbits, local.netnum -4)
   egress_subnet_cidr     = cidrsubnet(var.firewall_cidr, local.newbits, local.netnum - 2)
   mgmt_subnet_cidr    = cidrsubnet(var.firewall_cidr, local.newbits, local.netnum - 3)
-
   transit_subnet  = aviatrix_vpc.default.subnets[0].cidr
-  mgmt_subnet     =  aviatrix_vpc.mgmt_vpc.subnets[0].cidr
+  mgmt_subnet     =  aviatrix_vpc.management_vpc.subnets[0].cidr
   lan_subnet     = aviatrix_vpc.lan_vpc.subnets[0].cidr
   egress_subnet     =  aviatrix_vpc.egress_vpc.subnets[0].cidr
   region1    = "${var.region}-${var.az1}"
-  region2    = length(var.ha_region) > 0 ? "${var.ha_region}-${var.az2}" : "${var.region}-${var.az2}"
+  region2    = "${var.region}-${var.az2}"
 }

@@ -27,7 +27,7 @@ resource "aviatrix_vpc" "default" {
 
 
 # Management VPC
-resource "aviatrix_vpc" "mgmt_vpc" {
+resource "aviatrix_vpc" "management_vpc" {
   cloud_type           = 4
   account_name         = var.account
   name                 = "${local.name}-mgmt"
@@ -104,13 +104,13 @@ resource "aviatrix_firewall_instance" "firewall_instance" {
   count                  = var.ha_gw ? 0 : 1
   firewall_name          = "${local.name}-fw"
   firewall_size          = var.fw_instance_size
-  vpc_id                 = "${local.name}~-~${data.aviatrix_account.account_id.gcloud_project_id}"
+  vpc_id                 = format("%s~-~%s", aviatrix_transit_gateway.default.vpc_id, data.aviatrix_account.account_id.gcloud_project_id)
   firewall_image         = var.firewall_image
   firewall_image_version = var.firewall_image_version
-  egress_subnet          = "${local.egress_subnet}~~${var.region}~~${local.name}-egress"
+  egress_subnet          = format("%s~~%s~~%s", aviatrix_vpc.egress_vpc.subnets[0].cidr, aviatrix_vpc.egress_vpc.subnets[0].region, aviatrix_vpc.egress_vpc.subnets[0].name)
   firenet_gw_name        = aviatrix_transit_gateway.default.gw_name
-  management_subnet      = "${local.mgmt_subnet}~~${var.region}~~${local.name}-mgmt"
-  management_vpc_id =    aviatrix_vpc.mgmt_vpc.vpc_id
+  management_subnet      = local.is_palo ? format("%s~~%s~~%s", aviatrix_vpc.management_vpc.subnets[0].cidr, aviatrix_vpc.management_vpc.subnets[0].region, aviatrix_vpc.management_vpc.subnets[0].name) : null
+  management_vpc_id      = local.is_palo ? aviatrix_vpc.management_vpc.vpc_id : null
   egress_vpc_id =  aviatrix_vpc.egress_vpc.vpc_id
   bootstrap_bucket_name = var.bootstrap_bucket_name
   zone                   = local.region1
@@ -122,16 +122,15 @@ resource "aviatrix_firewall_instance" "firewall_instance_1" {
   count                  = var.ha_gw ? 1 : 0
   firewall_name          = "${local.name}-fw1"
   firewall_size          = var.fw_instance_size
-  vpc_id                 = "${local.name}~-~${data.aviatrix_account.account_id.gcloud_project_id}"
+  vpc_id                 = format("%s~-~%s", aviatrix_transit_gateway.default.vpc_id, data.aviatrix_account.account_id.gcloud_project_id)
   firewall_image         = var.firewall_image
   firewall_image_version = var.firewall_image_version
-  egress_subnet          = "${local.egress_subnet}~~${var.region}~~${local.name}-egress"
+  egress_subnet          = format("%s~~%s~~%s", aviatrix_vpc.egress_vpc.subnets[0].cidr, aviatrix_vpc.egress_vpc.subnets[0].region, aviatrix_vpc.egress_vpc.subnets[0].name)
   firenet_gw_name        = aviatrix_transit_gateway.default.gw_name
-  management_subnet      = "${local.mgmt_subnet}~~${var.region}~~${local.name}-mgmt"
-  management_vpc_id =    aviatrix_vpc.mgmt_vpc.vpc_id
-  egress_vpc_id =  aviatrix_vpc.egress_vpc.vpc_id
-  bootstrap_bucket_name = var.bootstrap_bucket_name
-
+  management_subnet      = local.is_palo ? format("%s~~%s~~%s", aviatrix_vpc.management_vpc.subnets[0].cidr, aviatrix_vpc.management_vpc.subnets[0].region, aviatrix_vpc.management_vpc.subnets[0].name) : null
+  management_vpc_id      = local.is_palo ? aviatrix_vpc.management_vpc.vpc_id : null
+  egress_vpc_id          = aviatrix_vpc.egress_vpc.vpc_id
+  bootstrap_bucket_name  = var.bootstrap_bucket_name
   zone                   = var.ha_gw ? local.region1 : null
 }
 
@@ -139,20 +138,17 @@ resource "aviatrix_firewall_instance" "firewall_instance_2" {
   count                  = var.ha_gw ? 1 : 0
   firewall_name          = "${local.name}-fw2"
   firewall_size          = var.fw_instance_size
-  vpc_id                 = "${local.name}~-~${data.aviatrix_account.account_id.gcloud_project_id}"
+  vpc_id                 = format("%s~-~%s", aviatrix_transit_gateway.default.vpc_id, data.aviatrix_account.account_id.gcloud_project_id)
   firewall_image         = var.firewall_image
-  firewall_image_version = var.firewall_image_version
-  egress_subnet          = "${local.egress_subnet}~~${var.region}~~${local.name}-egress"
+  firewall_image_version = var.firewall_image_version                
+  egress_subnet          = format("%s~~%s~~%s", aviatrix_vpc.egress_vpc.subnets[0].cidr, aviatrix_vpc.egress_vpc.subnets[0].region, aviatrix_vpc.egress_vpc.subnets[0].name)
   firenet_gw_name        = aviatrix_transit_gateway.default.gw_name
-  management_subnet      = "${local.mgmt_subnet}~~${var.region}~~${local.name}-mgmt"
-  management_vpc_id =  aviatrix_vpc.mgmt_vpc.vpc_id
+  management_subnet      = local.is_palo ? format("%s~~%s~~%s", aviatrix_vpc.management_vpc.subnets[0].cidr, aviatrix_vpc.management_vpc.subnets[0].region, aviatrix_vpc.management_vpc.subnets[0].name) : null
+  management_vpc_id      = local.is_palo ? aviatrix_vpc.management_vpc.vpc_id : null
   egress_vpc_id = aviatrix_vpc.egress_vpc.vpc_id
   bootstrap_bucket_name = var.bootstrap_bucket_name
-
   zone                   = var.ha_gw ? local.region2 : null
 }
-
-
 
 # Firenet
 resource "aviatrix_firenet" "firenet" {
@@ -166,7 +162,7 @@ resource "aviatrix_firenet" "firenet" {
 
 resource "aviatrix_firewall_instance_association" "firenet_instance" {
   count                = var.ha_gw ? 0 : 1
-  vpc_id               = format("%s~-~%s", aviatrix_transit_gateway.default.vpc_id, data.aviatrix_account.account_id.gcloud_project_id)
+  vpc_id               = aviatrix_firewall_instance.firewall_instance[0].vpc_id
   firenet_gw_name      = aviatrix_transit_gateway.default.gw_name
   instance_id          = aviatrix_firewall_instance.firewall_instance[0].instance_id
   lan_interface        = aviatrix_firewall_instance.firewall_instance[0].lan_interface

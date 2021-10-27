@@ -8,10 +8,10 @@ output "egress_vpc" {
   value       = aviatrix_vpc.egress_vpc
 }
 
-    
-output "mgmt_vpc" {
+
+output "management_vpc" {
   description = "The created Management VPC with all of it's attributes"
-  value       = aviatrix_vpc.mgmt_vpc
+  value       = aviatrix_vpc.management_vpc
 }
 
 
