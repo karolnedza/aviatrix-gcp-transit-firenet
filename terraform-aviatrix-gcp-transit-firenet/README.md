@@ -1,7 +1,7 @@
-# Aviatrix Transit Firenet for Azure
+# Aviatrix Transit Firenet for GCP
 
 ### Description
-This module deploys a VNET, Aviatrix transit gateways (HA), and firewall instances.
+This module deploys a 4 VPCs (Transit, Managment, Egress and LAN), Aviatrix transit gateways (HA), and firewall instances.
 
 ### Compatibility
 Module version | Terraform version | Controller version | Terraform provider version
@@ -67,15 +67,15 @@ key | value
 --- | ---
 region | GCP region to deploy the transit and firewall VPCs in
 account | The GCP access account on the Aviatrix controller, under which the controller will deploy these VPCs
-transit_cidr | The IP CIDR be used to create the Transit VPC
-firewall_cidr | The IP CIDR  be used to create the Managment, Egress and LAN VPC 
+transit_cidr | The IP CIDR to be used to create the Transit VPC (CIDR size must be between 16 to 28   **Insane mode requires a minimum 24**)
+firewall_cidr | The IP CIDR  be used to create the Managment, Egress and LAN VPC  (CIDR size must be between 16 to 26)
 firewall_image | String for the firewall image to use
 firewall_image_version | The firewall image version specific to the NGFW vendor image 
 
 Firewall images
 ```
 Palo Alto Networks VM-Series Next-Generation Firewall BYOL
-CCheck Point CloudGuard IaaS Firewall & Threat Prevention (Gateway only) (BYOL)
+Check Point CloudGuard IaaS Firewall & Threat Prevention (Gateway only) (BYOL)
 Fortinet FortiGate (BYOL) Next-Generation Firewall
 ```
 
