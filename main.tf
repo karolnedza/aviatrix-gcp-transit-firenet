@@ -9,7 +9,6 @@ module "gcp_ha_transit_1" {
   bootstrap_bucket_name = "av-pan-bootstrap"
   
   ha_gw = true
-
   insane_mode = true
 
 
