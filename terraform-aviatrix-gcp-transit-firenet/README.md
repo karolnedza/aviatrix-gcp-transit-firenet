@@ -11,7 +11,7 @@ v1.0.0 | 0.13 + 0.14 | >=6.5 | >=0.2.20
 **_Information on older releases can be found in respective release notes._*
 
 ### Diagram
-<img src="https://github.com/terraform-aviatrix-modules/terraform-aviatrix-azure-transit-firenet/blob/master/img/gcp-transit-firenet.png?raw=true">
+<img src="https://github.com/karolnedza/aviatrix-gcp-transit-firenet/blob/master/terraform-aviatrix-gcp-transit-firenet/img/gcp_transit_firenet.png">
 
 ### Usage Example
 
